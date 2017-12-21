@@ -12,8 +12,6 @@ import com.reactnativenavigation.presentation.NavigationOptionsListener;
 import com.reactnativenavigation.presentation.OverlayPresenter;
 import com.reactnativenavigation.utils.CompatUtils;
 
-import org.json.JSONObject;
-
 import java.util.Collection;
 import java.util.Collections;
 
@@ -22,8 +20,9 @@ public class Navigator extends ParentController {
 	private final ModalStack modalStack = new ModalStack();
 	private ViewController root;
 	private OverlayPresenter overlayPresenter;
+    private NavigationOptions defaultOptions = new NavigationOptions();
 
-	public Navigator(final Activity activity) {
+    public Navigator(final Activity activity) {
 		super(activity, "navigator" + CompatUtils.generateViewId());
 	}
 
@@ -54,7 +53,7 @@ public class Navigator extends ParentController {
 	 * Navigation methods
 	 */
 
-	public void setRoot(final ViewController viewController) {
+	void setRoot(final ViewController viewController) {
 		setRoot(viewController, null);
 	}
 
@@ -69,6 +68,14 @@ public class Navigator extends ParentController {
 			promise.resolve(viewController.getId());
 		}
 	}
+
+    public void setDefaultOptions(NavigationOptions defaultOptions) {
+        this.defaultOptions = defaultOptions;
+    }
+
+    public NavigationOptions getDefaultOptions() {
+        return defaultOptions;
+    }
 
 	public void setOptions(final String containerId, NavigationOptions options) {
 		ViewController target = findControllerById(containerId);
@@ -87,72 +94,53 @@ public class Navigator extends ParentController {
 	public void push(final String fromId, final ViewController viewController, Promise promise) {
 		ViewController from = findControllerById(fromId);
 		if (from != null) {
-			StackController parentStackController = from.getParentStackController();
-			if (parentStackController != null) {
-				parentStackController.push(viewController, promise);
-			}
+		    from.performOnParentStack(stack -> stack.push(viewController, promise));
 		}
 	}
 
-	public void pop(final String fromId) {
+	void pop(final String fromId) {
 		pop(fromId, null);
 	}
 
-	public void pop(final String fromId, Promise promise) {
+	void pop(final String fromId, Promise promise) {
 		ViewController from = findControllerById(fromId);
 		if (from != null) {
-			StackController parentStackController = from.getParentStackController();
-			if (parentStackController != null) {
-				parentStackController.pop(promise);
-			}
+		    from.performOnParentStack(stack -> stack.pop(promise));
 		}
 	}
 
-	public void popSpecific(final String id) {
+	void popSpecific(final String id) {
 		popSpecific(id, null);
 	}
 
 	public void popSpecific(final String id, Promise promise) {
 		ViewController from = findControllerById(id);
 		if (from != null) {
-			StackController parentStackController = from.getParentStackController();
-			if (parentStackController != null) {
-				parentStackController.popSpecific(from, promise);
-			} else {
-				rejectPromise(promise);
-			}
+		    from.performOnParentStack(stack -> stack.popSpecific(from, promise), () -> rejectPromise(promise));
 		} else {
 			rejectPromise(promise);
 		}
 	}
 
-	public void popToRoot(final String id) {
+	void popToRoot(final String id) {
 		popToRoot(id, null);
 	}
 
 	public void popToRoot(final String id, Promise promise) {
 		ViewController from = findControllerById(id);
 		if (from != null) {
-			StackController parentStackController = from.getParentStackController();
-			if (parentStackController != null) {
-				parentStackController.popToRoot(promise);
-			}
+		    from.performOnParentStack(stack -> stack.popToRoot(promise));
 		}
 	}
 
-	public void popTo(final String containerId) {
+	void popTo(final String containerId) {
 		popTo(containerId, null);
 	}
 
 	public void popTo(final String containerId, Promise promise) {
 		ViewController target = findControllerById(containerId);
 		if (target != null) {
-			StackController parentStackController = target.getParentStackController();
-			if (parentStackController != null) {
-				parentStackController.popTo(target, promise);
-			} else {
-				rejectPromise(promise);
-			}
+		    target.performOnParentStack(stack -> stack.popTo(target, promise), () -> rejectPromise(promise));
 		} else {
 			rejectPromise(promise);
 		}

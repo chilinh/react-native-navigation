@@ -1,6 +1,7 @@
 
 #import "RNNRootViewController.h"
 #import <React/RCTConvert.h>
+#import "RNNAnimator.h"
 #import "RNNNavigationButtons.h"
 
 @interface RNNRootViewController()
@@ -16,28 +17,38 @@
 				withOptions:(RNNNavigationOptions*)options
 			withContainerId:(NSString*)containerId
 			rootViewCreator:(id<RNNRootViewCreator>)creator
-			   eventEmitter:(RNNEventEmitter*)eventEmitter {
+			   eventEmitter:(RNNEventEmitter*)eventEmitter
+				   animator:(RNNAnimator *)animator {
 	self = [super init];
 	self.containerId = containerId;
 	self.containerName = name;
 	self.navigationOptions = options;
 	self.eventEmitter = eventEmitter;
+	self.animator = animator;
 	self.view = [creator createRootView:self.containerName rootViewId:self.containerId];
 	
 	[[NSNotificationCenter defaultCenter] addObserver:self
 											 selector:@selector(onJsReload)
 												 name:RCTJavaScriptWillStartLoadingNotification
 											   object:nil];
-	
+	self.navigationController.modalPresentationStyle = UIModalPresentationCustom;
+	self.navigationController.delegate = self;
 	self.navigationButtons = [[RNNNavigationButtons alloc] initWithViewController:self];
-	
 	return self;
 }
-
+	
 -(void)viewWillAppear:(BOOL)animated{
 	[super viewWillAppear:animated];
 	[self.navigationOptions applyOn:self];
 	[self applyNavigationButtons];
+}
+
+- (void)viewDidLoad {
+	[super viewDidLoad];
+}
+
+-(BOOL)isAnimated {
+	return self.animator;
 }
 
 - (BOOL)prefersStatusBarHidden {
@@ -55,8 +66,8 @@
 
 - (BOOL)hidesBottomBarWhenPushed
 {
-	if (self.navigationOptions.tabBar && self.navigationOptions.tabBar.hidden) {
-		return [self.navigationOptions.tabBar.hidden boolValue];
+	if (self.navigationOptions.bottomTabs && self.navigationOptions.bottomTabs.hidden) {
+		return [self.navigationOptions.bottomTabs.hidden boolValue];
 	}
 	return NO;
 }
@@ -70,6 +81,32 @@
 	[super viewDidDisappear:animated];
 	[self.eventEmitter sendContainerDidDisappear:self.containerId];
 }
+
+- (void)navigationController:(UINavigationController *)navigationController didShowViewController:(UIViewController *)viewController animated:(BOOL)animated{
+	RNNRootViewController* vc =  (RNNRootViewController*)viewController;
+	if (![vc.navigationOptions.backButtonTransition isEqualToString:@"custom"]){
+		navigationController.delegate = nil;
+	}
+}
+
+- (id<UIViewControllerAnimatedTransitioning>)navigationController:(UINavigationController *)navigationController
+								  animationControllerForOperation:(UINavigationControllerOperation)operation
+											   fromViewController:(UIViewController*)fromVC
+												 toViewController:(UIViewController*)toVC {
+{
+	if (operation == UINavigationControllerOperationPush) {
+		return self.animator;
+	} else if (operation == UINavigationControllerOperationPop) {
+		return self.animator;
+	} else {
+		return nil;
+	}
+}
+	return nil;
+
+}
+
+
 
 -(void) applyNavigationButtons{
 	[self.navigationButtons applyLeftButtons:self.navigationOptions.leftButtons rightButtons:self.navigationOptions.rightButtons];

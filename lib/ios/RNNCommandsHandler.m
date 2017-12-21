@@ -1,20 +1,21 @@
-
 #import "RNNCommandsHandler.h"
-
 #import "RNNModalManager.h"
 #import "RNNNavigationStackManager.h"
 #import "RNNNavigationOptions.h"
 #import "RNNRootViewController.h"
+#import "React/RCTUIManager.h"
 
 @implementation RNNCommandsHandler {
 	RNNControllerFactory *_controllerFactory;
 	RNNStore *_store;
+	RCTBridge* _bridge;
 	RNNNavigationStackManager* _navigationStackManager;
 	RNNModalManager* _modalManager;
 }
 
--(instancetype) initWithStore:(RNNStore*)store controllerFactory:(RNNControllerFactory*)controllerFactory {
+-(instancetype) initWithStore:(RNNStore*)store controllerFactory:(RNNControllerFactory*)controllerFactory andBridge:(RCTBridge*)bridge {
 	self = [super init];
+	_bridge = bridge;
 	_store = store;
 	_controllerFactory = controllerFactory;
 	_navigationStackManager = [[RNNNavigationStackManager alloc] initWithStore:_store];
@@ -47,17 +48,27 @@
 	}
 }
 
--(void) push:(NSString*)containerId layout:(NSDictionary*)layout {
+-(void) push:(NSString*)containerId layout:(NSDictionary*)layout completion:(RNNTransitionCompletionBlock)completion {
 	[self assertReady];
-	
 	UIViewController *newVc = [_controllerFactory createLayoutAndSaveToStore:layout];
-	[_navigationStackManager push:newVc onTop:containerId];
+	UIViewController *fromVc = [_store findContainerForId:containerId];
+	[_bridge.uiManager setAvailableSize:fromVc.view.bounds.size forRootView:newVc.view];
+	[_navigationStackManager push:newVc onTop:containerId completion:completion];
 }
 
--(void) pop:(NSString*)containerId {
+-(void)pop:(NSString*)containerId options:(NSDictionary*)options{
 	[self assertReady];
+	NSDictionary* animationData = options[@"customTransition"];
+	if (animationData){
+		if ([animationData objectForKey:@"animations"]) {
+			[_navigationStackManager pop:containerId withAnimationData:animationData];
+		} else {
+			[[NSException exceptionWithName:NSInvalidArgumentException reason:@"unsupported transitionAnimation" userInfo:nil] raise];
+		}
+	} else {
+		[_navigationStackManager pop:containerId withAnimationData:nil];
+	}
 	
-	[_navigationStackManager pop:containerId];
 }
 
 -(void) popTo:(NSString*)containerId {
@@ -72,11 +83,11 @@
 	[_navigationStackManager popToRoot:containerId];
 }
 
--(void) showModal:(NSDictionary*)layout {
+-(void) showModal:(NSDictionary*)layout completion:(RNNTransitionCompletionBlock)completion {
 	[self assertReady];
 	
 	UIViewController *newVc = [_controllerFactory createLayoutAndSaveToStore:layout];
-	[_modalManager showModal:newVc];
+	[_modalManager showModal:newVc completion:completion];
 }
 
 -(void) dismissModal:(NSString*)containerId {

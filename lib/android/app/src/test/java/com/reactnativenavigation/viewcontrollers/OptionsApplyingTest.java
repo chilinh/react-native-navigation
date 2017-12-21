@@ -6,23 +6,18 @@ import android.graphics.drawable.ColorDrawable;
 import android.view.View;
 
 import com.reactnativenavigation.BaseTest;
-import com.reactnativenavigation.mocks.TestContainerView;
+import com.reactnativenavigation.mocks.TestContainerLayout;
 import com.reactnativenavigation.parse.NavigationOptions;
-import com.reactnativenavigation.views.TopbarContainerViewCreator;
 
-import org.json.JSONObject;
 import org.junit.Test;
 
 import static org.assertj.core.api.Java6Assertions.assertThat;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 public class OptionsApplyingTest extends BaseTest {
 	private Activity activity;
 	private ContainerViewController uut;
-	private ContainerViewController.ContainerView view;
+	private ContainerViewController.IReactView view;
 	private NavigationOptions initialNavigationOptions;
 
 	@Override
@@ -30,14 +25,14 @@ public class OptionsApplyingTest extends BaseTest {
 		super.beforeEach();
 		activity = newActivity();
 		initialNavigationOptions = new NavigationOptions();
-		view = spy(new TestContainerView(activity));
-		uut = new ContainerViewController(activity, "containerId1", "containerName",
-				new TopbarContainerViewCreator(new ContainerViewController.ContainerViewCreator() {
-					@Override
-					public ContainerViewController.ContainerView create(final Activity activity1, final String containerId, final String containerName) {
-						return view;
-					}
-				}), initialNavigationOptions);
+		view = spy(new TestContainerLayout(activity));
+		uut = new ContainerViewController(activity,
+                "containerId1",
+                "containerName",
+                (activity1, containerId, containerName) -> view,
+                initialNavigationOptions
+        );
+		uut.ensureViewIsCreated();
 	}
 
 	@Test
