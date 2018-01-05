@@ -3,11 +3,14 @@ package com.reactnativenavigation.presentation;
 import android.view.View;
 
 import com.reactnativenavigation.anim.StackAnimator;
+import com.reactnativenavigation.parse.Button;
 import com.reactnativenavigation.parse.NavigationOptions;
 import com.reactnativenavigation.parse.TopBarOptions;
+import com.reactnativenavigation.parse.TopTabOptions;
 import com.reactnativenavigation.parse.TopTabsOptions;
-import com.reactnativenavigation.utils.TypefaceLoader;
 import com.reactnativenavigation.views.TopBar;
+
+import java.util.ArrayList;
 
 public class OptionsPresenter {
 
@@ -21,10 +24,12 @@ public class OptionsPresenter {
         animator = new StackAnimator(topBar.getContext());
     }
 
-	public void applyOptions(NavigationOptions options) {
+    public void applyOptions(NavigationOptions options) {
         applyTopBarOptions(options.topBarOptions);
+        applyButtons(options.leftButtons, options.rightButtons);
         applyTopTabsOptions(options.topTabsOptions);
-	}
+        applyTopTabOptions(options.topTabOptions);
+    }
 
     private void applyTopBarOptions(TopBarOptions options) {
         topBar.setTitle(options.title);
@@ -32,8 +37,7 @@ public class OptionsPresenter {
         topBar.setTitleTextColor(options.textColor);
         topBar.setTitleFontSize(options.textFontSize);
 
-        TypefaceLoader typefaceLoader = new TypefaceLoader();
-        topBar.setTitleTypeface(typefaceLoader.getTypeFace(topBar.getContext(), options.textFontFamily));
+        topBar.setTitleTypeface(options.textFontFamily);
         if (options.hidden == NavigationOptions.BooleanOptions.True) {
             hideTopBar(options.animateHide);
         }
@@ -64,7 +68,18 @@ public class OptionsPresenter {
 		}
 	}
 
-    private void applyTopTabsOptions(TopTabsOptions topTabsOptions) {
-        // TODO: -guyca
+    private void applyButtons(ArrayList<Button> leftButtons, ArrayList<Button> rightButtons) {
+        topBar.setButtons(leftButtons, rightButtons);
+    }
+
+    private void applyTopTabsOptions(TopTabsOptions options) {
+        topBar.applyTopTabsColors(options.selectedTabColor, options.unselectedTabColor);
+        topBar.applyTopTabsFontSize(options.fontSize);
+    }
+
+    private void applyTopTabOptions(TopTabOptions topTabOptions) {
+        if (topTabOptions.fontFamily != null) {
+            topBar.setTopTabFontFamily(topTabOptions.tabIndex, topTabOptions.fontFamily);
+        }
     }
 }
