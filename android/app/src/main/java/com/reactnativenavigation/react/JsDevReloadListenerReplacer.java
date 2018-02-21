@@ -1,13 +1,11 @@
 package com.reactnativenavigation.react;
 
-import android.app.Activity;
-
 import com.facebook.react.ReactInstanceManager;
-import com.facebook.react.bridge.JavaJSExecutor;
-import com.facebook.react.devsupport.ReactInstanceManagerDevHelper;
 import com.reactnativenavigation.utils.ReflectionUtils;
 
-import javax.annotation.Nullable;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 
 class JsDevReloadListenerReplacer {
     private final ReactInstanceManager reactInstanceManager;
@@ -23,55 +21,54 @@ class JsDevReloadListenerReplacer {
     }
 
     void replace() {
-        ReactInstanceManagerDevHelper originalHandler = getOriginalHandler();
-        DevCommandsHandlerProxy proxy = new DevCommandsHandlerProxy(originalHandler, listener);
-        replaceInReactInstanceManager(proxy);
-        replaceInDevSupportManager(proxy);
-    }
+        Object originalHelper = getOriginalHelper();
 
-    private void replaceInDevSupportManager(DevCommandsHandlerProxy proxy) {
         Object devSupportManager = ReflectionUtils.getDeclaredField(reactInstanceManager, "mDevSupportManager");
-        ReflectionUtils.setField(devSupportManager, "mReactInstanceCommandsHandler", proxy);
+
+        Object proxy = Proxy.newProxyInstance(
+                originalHelper.getClass().getClassLoader(),
+                originalHelper.getClass().getInterfaces(),
+                new DevHelperProxy(originalHelper, listener));
+
+        if (ReflectionUtils.getDeclaredField(reactInstanceManager, "mDevInterface") == null) { // RN >= 0.52
+            ReflectionUtils.setField(devSupportManager, "mReactInstanceManagerHelper", proxy);
+        } else {                                                                                         // RN <= 0.51
+            ReflectionUtils.setField(reactInstanceManager, "mDevInterface", proxy);
+            ReflectionUtils.setField(devSupportManager, "mReactInstanceCommandsHandler", proxy);
+        }
     }
 
-    private ReactInstanceManagerDevHelper getOriginalHandler() {
-        return (ReactInstanceManagerDevHelper) ReflectionUtils.getDeclaredField(reactInstanceManager, "mDevInterface");
+
+    private Object getOriginalHelper() {
+        Object devInterface = ReflectionUtils.getDeclaredField(reactInstanceManager, "mDevInterface");
+
+        if (devInterface == null) { // RN >= 0.52
+            Object devSupportManager = ReflectionUtils.getDeclaredField(reactInstanceManager, "mDevSupportManager");
+            return ReflectionUtils.getDeclaredField(devSupportManager, "mReactInstanceManagerHelper");
+        }
+
+        return devInterface;        // RN <= 0.51
     }
 
-    private void replaceInReactInstanceManager(DevCommandsHandlerProxy proxy) {
-        ReflectionUtils.setField(reactInstanceManager, "mDevInterface", proxy);
-    }
 
-    private static class DevCommandsHandlerProxy implements ReactInstanceManagerDevHelper {
-        private ReactInstanceManagerDevHelper originalReactHandler;
+    private static class DevHelperProxy implements InvocationHandler {
+        private Object originalReactHelper;
         private final Listener listener;
 
-        DevCommandsHandlerProxy(ReactInstanceManagerDevHelper originalReactHandler, Listener listener) {
-            this.originalReactHandler = originalReactHandler;
+        DevHelperProxy(Object originalReactHelper, Listener listener) {
+            this.originalReactHelper = originalReactHelper;
             this.listener = listener;
         }
 
         @Override
-        public void onReloadWithJSDebugger(JavaJSExecutor.Factory proxyExecutorFactory) {
-            listener.onJsDevReload();
-            originalReactHandler.onReloadWithJSDebugger(proxyExecutorFactory);
-        }
+        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            String methodName = method.getName();
 
-        @Override
-        public void onJSBundleLoadedFromServer() {
-            listener.onJsDevReload();
-            originalReactHandler.onJSBundleLoadedFromServer();
-        }
+            if (methodName.equals("onJSBundleLoadedFromServer") || methodName.equals("onReloadWithJSDebugger")) {
+                listener.onJsDevReload();
+            }
 
-        @Override
-        public void toggleElementInspector() {
-            originalReactHandler.toggleElementInspector();
-        }
-
-        @Nullable
-        @Override
-        public Activity getCurrentActivity() {
-            return originalReactHandler.getCurrentActivity();
+            return method.invoke(originalReactHelper, args);
         }
     }
 }
